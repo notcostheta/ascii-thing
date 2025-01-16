@@ -4,18 +4,92 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000000;
+  --muted: #666666;
+  --link: #000000;
+  --link-hover: #333333;
+  --gray-100: #000000;
+  --gray-400: #333333;
+  --gray-500: #666666;
+  --border: #e5e5e5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+[data-theme="dark"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted: #999999;
+  --link: #ffffff;
+  --link-hover: #cccccc;
+  --gray-100: #ffffff;
+  --gray-400: #cccccc;
+  --gray-500: #999999;
+  --border: #333333;
+}
+
+@media screen and (min-width: 320px) {
+  html {
+    font-size: calc(14px + 6 * ((100vw - 320px) / 680));
+  }
+}
+
+@media screen and (min-width: 1000px) {
+  html {
+    font-size: 22px;
+  }
+}
+
+@media screen and (max-width: 320px) {
+  html {
+    font-size: 14px;
   }
 }
 
 body {
-  color: var(--foreground);
+  font-family: var(--font-mono);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--foreground);
+  line-height: 1.7;
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
 }
+
+p {
+  margin-bottom: 1.5rem;
+  line-height: 1.8;
+  font-size: clamp(1rem, 2.5vw, 1.2rem);
+}
+
+.date {
+  font-style: italic;
+  color: var(--muted);
+  font-size: clamp(0.875rem, 2vw, 1rem);
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin-bottom: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+h2 {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  margin-bottom: clamp(1rem, 3vw, 2rem);
+}
+
+h3 {
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+/* Masonry grid styles */
+.masonry-grid {
+  display: flex;
+  width: auto;
+}
+
+.masonry-grid_column {
+  background-clip: padding-box;
+}
+
+.masonry-grid_column > div {
+  margin-bottom: 16px;
+}
+
