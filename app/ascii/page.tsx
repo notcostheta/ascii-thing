@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Layout } from "@/components/layout"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ImageIcon, Upload, Download, Repeat } from 'lucide-react'
-
-const ASCII_CHARS = " .:-=+*#%@"
+import { AsciiConverter, type AsciiScale } from "@/lib/ascii-converter"
 
 export default function AsciiArtGenerator() {
     const [asciiArt, setAsciiArt] = useState<string>("")
@@ -16,69 +16,55 @@ export default function AsciiArtGenerator() {
     const [width, setWidth] = useState<number>(100)
     const [contrast, setContrast] = useState<number>(50)
     const [brightness, setBrightness] = useState<number>(50)
-    const [invert, setInvert] = useState(false)
-    const [autoUpdate, setAutoUpdate] = useState(true)
+    const [invert, setInvert] = useState<number>(0)
+    const [scale, setScale] = useState<AsciiScale>("normal")
+    const [saturation, setSaturation] = useState(100)
+    const [edgeDetection, setEdgeDetection] = useState(false)
+    const [edgeIntensity, setEdgeIntensity] = useState(1)
+    const [sharpen, setSharpen] = useState(false)
+    const [sharpness, setSharpness] = useState(9)
+    const [dithering, setDithering] = useState<'none' | 'FloydSteinberg' | 'JJN' | 'Stucki' | 'Atkinson'>('none')
+    const [spaceDensity, setSpaceDensity] = useState(1)
+    const [sepia, setSepia] = useState(0)
+    const [hue, setHue] = useState(0)
+    const [grayscale, setGrayscale] = useState(0)
+    const [edgeInvertColors, setEdgeInvertColors] = useState(true)
+    const [transparentFrame, setTransparentFrame] = useState(0)
+    const converterRef = useRef<AsciiConverter | null>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
 
-    const convertToAscii = (imageData: ImageData, width: number, height: number) => {
-        const pixels = imageData.data
-        let result = ""
-
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const idx = (y * width + x) * 4
-                const r = pixels[idx]
-                const g = pixels[idx + 1]
-                const b = pixels[idx + 2]
-
-                // Convert to grayscale
-                let gray = 0.299 * r + 0.587 * g + 0.114 * b
-
-                // Apply brightness
-                gray = gray * (brightness / 50.0)
-
-                // Apply contrast
-                gray = ((gray - 128.0) * (contrast / 50.0)) + 128.0
-
-                // Apply invert
-                if (invert) {
-                    gray = 255 - gray
-                }
-
-                // Ensure values are within bounds
-                gray = Math.max(0, Math.min(255, gray))
-
-                // Convert to ASCII
-                const charIndex = Math.floor((gray / 255) * (ASCII_CHARS.length - 1))
-                result += ASCII_CHARS[charIndex]
-            }
-            result += "\n"
-        }
-
-        return result
-    }
+    useEffect(() => {
+        converterRef.current = new AsciiConverter()
+    }, [])
 
     const processImage = async (url: string) => {
+        if (!converterRef.current) return;
+        
         const img = new Image()
         img.crossOrigin = "anonymous"
         img.src = url
 
         img.onload = () => {
-            const canvas = canvasRef.current
-            if (!canvas) return
-
-            const ctx = canvas.getContext("2d")
-            if (!ctx) return
-
-            const aspectRatio = img.height / img.width
-            const calculatedHeight = Math.floor(width * aspectRatio)
-
-            canvas.width = width
-            canvas.height = calculatedHeight
-
-            ctx.drawImage(img, 0, 0, width, calculatedHeight)
-            const imageData = ctx.getImageData(0, 0, width, calculatedHeight)
-            const ascii = convertToAscii(imageData, width, calculatedHeight)
+            if (!converterRef.current) return;
+            const ascii = converterRef.current.processImage(img, {
+                width,
+                brightness,
+                contrast,
+                invert,
+                scaleType: scale,
+                saturation,
+                sepia,
+                hue,
+                grayscale,
+                edgeDetection,
+                edgeIntensity,
+                edgeInvertColors,
+                sharpen,
+                sharpness,
+                dithering,
+                spaceDensity,
+                transparentFrame
+            })
             setAsciiArt(ascii)
         }
     }
@@ -113,167 +99,290 @@ export default function AsciiArtGenerator() {
 
     return (
         <Layout>
+            {/* File Upload Section */}
+            <div className="bg-zinc-900/50 backdrop-blur p-6 mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                        <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="bg-black border-gray-800 text-sm file:bg-gray-900 file:text-white file:border-0"
+                        />
+                    </div>
+                    <Button
+                        onClick={handleDemoImage}
+                        variant="outline"
+                        className="border-gray-800 hover:bg-gray-900"
+                    >
+                        Try Demo
+                    </Button>
+                </div>
+            </div>
+
+            {/* Main Content Area */}
             <div className="space-y-8">
-                {/* Controls section */}
-                <div className="bg-zinc-900/50 backdrop-blur p-6 space-y-6">
-                    {/* File upload */}
-                    <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                            <Input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                className="bg-black border-gray-800 text-sm file:bg-gray-900 file:text-white file:border-0"
-                            />
+                {/* Top Grid */}
+                <div className="grid grid-cols-2 gap-6">
+                    {/* Left Column - Image and Scale/Dither */}
+                    <div className="space-y-6">
+                        {/* Image Preview - Smaller height */}
+                        {imageUrl ? (
+                            <div>
+                                <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
+                                    <ImageIcon className="w-4 h-4" />
+                                    <span>Original Image</span>
+                                </div>
+                                <div className="bg-zinc-900/50 backdrop-blur p-4 flex items-center justify-center h-[250px]">
+                                    <img
+                                        src={imageUrl}
+                                        alt="Original"
+                                        className="max-w-full max-h-full object-contain"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-[250px] bg-zinc-900/50 backdrop-blur flex items-center justify-center text-gray-500">
+                                Upload an image to begin
+                            </div>
+                        )}
+
+                        {/* Scale and Dithering Controls */}
+                        <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
+                            {/* ASCII Scale selector */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-400 w-24">Scale</span>
+                                <Select value={scale} onValueChange={(value: AsciiScale) => {
+                                    setScale(value)
+                                    if (imageUrl) processImage(imageUrl)
+                                }}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Select scale" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="minimalist">Minimalist</SelectItem>
+                                        <SelectItem value="normal">Normal</SelectItem>
+                                        <SelectItem value="normal2">Normal 2</SelectItem>
+                                        <SelectItem value="alphabetic">Alphabetic</SelectItem>
+                                        <SelectItem value="alphanumeric">Alphanumeric</SelectItem>
+                                        <SelectItem value="numerical">Numerical</SelectItem>
+                                        <SelectItem value="extended">Extended</SelectItem>
+                                        <SelectItem value="math">Math</SelectItem>
+                                        <SelectItem value="arrow">Arrow</SelectItem>
+                                        <SelectItem value="grayscale">Grayscale</SelectItem>
+                                        <SelectItem value="codepage437">CodePage 437</SelectItem>
+                                        <SelectItem value="blockelement">Block Element</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Dithering selector */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-400 w-24">Dither</span>
+                                <Select value={dithering} onValueChange={(value: typeof dithering) => {
+                                    setDithering(value)
+                                    if (imageUrl) processImage(imageUrl)
+                                }}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Select dithering" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="FloydSteinberg">Floyd-Steinberg</SelectItem>
+                                        <SelectItem value="JJN">Jarvis, Judice, and Ninke</SelectItem>
+                                        <SelectItem value="Stucki">Stucki</SelectItem>
+                                        <SelectItem value="Atkinson">Atkinson</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <Button
-                            onClick={handleDemoImage}
-                            variant="outline"
-                            className="border-gray-800 hover:bg-gray-900"
-                        >
-                            Try Demo
-                        </Button>
                     </div>
 
-                    {/* Sliders */}
-                    <div className="space-y-4">
-                        {/* Width slider */}
+                    {/* Right Side - All Controls */}
+                    <div className="grid grid-rows-2 gap-6">
+                        {/* Top Row - Image Adjustments */}
+                        <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
+                            {/* Brightness slider */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-400 w-24">Bright: {brightness}</span>
+                                <Slider
+                                    value={[brightness]}
+                                    onValueChange={(value) => {
+                                        setBrightness(value[0])
+                                        if (imageUrl) processImage(imageUrl)
+                                    }}
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    className="flex-1"
+                                />
+                            </div>
+                            {/* Contrast slider */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-400 w-24">Contrast: {contrast}</span>
+                                <Slider
+                                    value={[contrast]}
+                                    onValueChange={(value) => {
+                                        setContrast(value[0])
+                                        if (imageUrl) processImage(imageUrl)
+                                    }}
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    className="flex-1"
+                                />
+                            </div>
+                            {/* Saturation slider */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-400 w-24">Sat: {saturation}</span>
+                                <Slider
+                                    value={[saturation]}
+                                    onValueChange={(value) => {
+                                        setSaturation(value[0])
+                                        if (imageUrl) processImage(imageUrl)
+                                    }}
+                                    min={0}
+                                    max={200}
+                                    step={1}
+                                    className="flex-1"
+                                />
+                            </div>
+                            {/* Add invert slider here */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-400 w-24">Invert: {invert}</span>
+                                <Slider
+                                    value={[invert]}
+                                    onValueChange={(value) => {
+                                        setInvert(value[0])
+                                        if (imageUrl) processImage(imageUrl)
+                                    }}
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    className="flex-1"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Bottom Row - Effects */}
+                        <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
+                            {/* Space Density slider */}
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-400 w-24">Space: {spaceDensity}</span>
+                                <Slider
+                                    value={[spaceDensity]}
+                                    onValueChange={(value) => {
+                                        setSpaceDensity(value[0])
+                                        if (imageUrl) processImage(imageUrl)
+                                    }}
+                                    min={0.1}
+                                    max={5}
+                                    step={0.1}
+                                    className="flex-1"
+                                />
+                            </div>
+
+                            {/* Edge Detection controls */}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Switch
+                                        checked={edgeDetection}
+                                        onCheckedChange={(checked) => {
+                                            setEdgeDetection(checked)
+                                            if (imageUrl) processImage(imageUrl)
+                                        }}
+                                        className="data-[state=checked]:bg-gray-50"
+                                    />
+                                    <span className="text-sm text-gray-400">Edge Detection</span>
+                                </div>
+                                {edgeDetection && (
+                                    <div className="pl-8">
+                                        <Slider
+                                            value={[edgeIntensity]}
+                                            onValueChange={(value) => {
+                                                setEdgeIntensity(value[0])
+                                                if (imageUrl) processImage(imageUrl)
+                                            }}
+                                            min={0.1}
+                                            max={5}
+                                            step={0.1}
+                                            className="flex-1"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Sharpen controls */}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Switch
+                                        checked={sharpen}
+                                        onCheckedChange={(checked) => {
+                                            setSharpen(checked)
+                                            if (imageUrl) processImage(imageUrl)
+                                        }}
+                                        className="data-[state=checked]:bg-gray-50"
+                                    />
+                                    <span className="text-sm text-gray-400">Sharpen</span>
+                                </div>
+                                {sharpen && (
+                                    <div className="pl-8">
+                                        <Slider
+                                            value={[sharpness]}
+                                            onValueChange={(value) => {
+                                                setSharpness(value[0])
+                                                if (imageUrl) processImage(imageUrl)
+                                            }}
+                                            min={1}
+                                            max={20}
+                                            step={1}
+                                            className="flex-1"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ASCII Output Section - Added mt-12 for more space */}
+            <div className="space-y-2 mt-12">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <Upload className="w-4 h-4" />
+                        <span>ASCII Output</span>
+                    </div>
+                    {/* Add width slider here */}
+                    <div className="flex items-center gap-4">
                         <div className="flex items-center gap-4">
-                            <span className="text-sm text-gray-400 w-24">Width: {width}</span>
+                            <span className="text-sm text-gray-400">Width: {width}</span>
                             <Slider
                                 value={[width]}
                                 onValueChange={(value) => {
                                     setWidth(value[0])
-                                    if (imageUrl && autoUpdate) processImage(imageUrl)
+                                    if (imageUrl) processImage(imageUrl)
                                 }}
                                 min={20}
                                 max={200}
                                 step={1}
-                                className="flex-1"
+                                className="w-[100px]"
                             />
-                        </div>
-
-                        {/* Contrast slider */}
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-gray-400 w-24">Contrast: {contrast}</span>
-                            <Slider
-                                value={[contrast]}
-                                onValueChange={(value) => {
-                                    setContrast(value[0])
-                                    if (imageUrl && autoUpdate) processImage(imageUrl)
-                                }}
-                                min={0}
-                                max={100}
-                                step={1}
-                                className="flex-1"
-                            />
-                        </div>
-
-                        {/* Brightness slider */}
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-gray-400 w-24">Brightness: {brightness}</span>
-                            <Slider
-                                value={[brightness]}
-                                onValueChange={(value) => {
-                                    setBrightness(value[0])
-                                    if (imageUrl && autoUpdate) processImage(imageUrl)
-                                }}
-                                min={0}
-                                max={100}
-                                step={1}
-                                className="flex-1"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Switches and buttons */}
-                    <div className="flex flex-wrap items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <Switch
-                                checked={invert}
-                                onCheckedChange={(checked) => {
-                                    setInvert(checked)
-                                    if (imageUrl && autoUpdate) processImage(imageUrl)
-                                }}
-                                className="data-[state=checked]:bg-gray-50"
-                            />
-                            <span className="text-sm text-gray-400">Invert Colors</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Switch
-                                checked={autoUpdate}
-                                onCheckedChange={setAutoUpdate}
-                                className="data-[state=checked]:bg-gray-50"
-                            />
-                            <span className="text-sm text-gray-400">Auto Update</span>
-                        </div>
-
-                        <div className="flex items-center gap-2 ml-auto">
-                            <Button
-                                onClick={() => processImage(imageUrl)}
-                                variant="outline"
-                                size="sm"
-                                className="border-gray-800 hover:bg-gray-900"
-                            >
-                                <Repeat className="w-4 h-4 mr-2" />
-                                Update
-                            </Button>
-                            <Button
-                                onClick={handleDownload}
-                                variant="outline"
-                                size="sm"
-                                className="border-gray-800 hover:bg-gray-900"
-                                disabled={!asciiArt}
-                            >
-                                <Download className="w-4 h-4 mr-2" />
-                                Download
-                            </Button>
                         </div>
                     </div>
                 </div>
-
-                {/* Output section */}
-                <div className="space-y-6">
-                    {/* Original image */}
-                    {imageUrl && (
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <ImageIcon className="w-4 h-4" />
-                                <span>Original Image</span>
-                            </div>
-                            <div className="bg-zinc-900/50 backdrop-blur p-4 flex items-center justify-center">
-                                <img
-                                    src={imageUrl}
-                                    alt="Original"
-                                    className="max-w-full max-h-[400px] object-contain"
-                                />
-                            </div>
+                <div className="bg-zinc-900/50 backdrop-blur p-4 overflow-auto max-h-[600px]">
+                    <canvas ref={canvasRef} className="hidden" />
+                    {asciiArt ? (
+                        <pre className="text-xs leading-none whitespace-pre font-mono text-gray-300">
+                            {asciiArt}
+                        </pre>
+                    ) : (
+                        <div className="h-[200px] flex items-center justify-center text-gray-500">
+                            Upload an image to see the ASCII output
                         </div>
                     )}
-
-                    {/* ASCII output */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                            <Upload className="w-4 h-4" />
-                            <span>ASCII Output</span>
-                        </div>
-                        <div className="bg-zinc-900/50 backdrop-blur p-4 overflow-auto max-h-[400px]">
-                            <canvas ref={canvasRef} className="hidden" />
-                            {asciiArt ? (
-                                <pre className="text-xs leading-none whitespace-pre font-mono text-gray-300">
-                                    {asciiArt}
-                                </pre>
-                            ) : (
-                                <div className="h-[200px] flex items-center justify-center text-gray-500">
-                                    Upload an image to see the ASCII output
-                                </div>
-                            )}
-                        </div>
-                    </div>
                 </div>
-
-                {/* Size info */}
                 {asciiArt && (
                     <div className="text-sm text-gray-500">
                         Output Size: {width} cols × {asciiArt.split('\n').length} rows
@@ -281,5 +390,5 @@ export default function AsciiArtGenerator() {
                 )}
             </div>
         </Layout>
-    )
+    );
 }

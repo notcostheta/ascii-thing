@@ -7,6 +7,11 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono',
 })
 
+export const metadata = {
+  title: 'ASCII Art Generator',
+  description: 'Convert images to ASCII art',
+}
+
 export default function RootLayout({
   children,
 }: {
