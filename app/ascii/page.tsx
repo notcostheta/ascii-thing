@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ImageIcon, Upload, Download, Repeat } from 'lucide-react'
 import { AsciiConverter, type AsciiScale } from "@/lib/ascii-converter"
+import { VideoConverter } from '@/lib/video-converter'
 
 export default function AsciiArtGenerator() {
     const [asciiArt, setAsciiArt] = useState<string>("")
@@ -30,11 +31,17 @@ export default function AsciiArtGenerator() {
     const [grayscale, setGrayscale] = useState(0)
     const [edgeInvertColors, setEdgeInvertColors] = useState(true)
     const [transparentFrame, setTransparentFrame] = useState(0)
+    const [isVideo, setIsVideo] = useState(false)
+    const [isPlaying, setIsPlaying] = useState(false)
+    const [videoTime, setVideoTime] = useState(0)
+    const [videoDuration, setVideoDuration] = useState(0)
     const converterRef = useRef<AsciiConverter | null>(null)
+    const videoConverterRef = useRef<VideoConverter | null>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
 
     useEffect(() => {
         converterRef.current = new AsciiConverter()
+        videoConverterRef.current = new VideoConverter(converterRef.current)
     }, [])
 
     const processImage = async (url: string) => {
@@ -69,11 +76,19 @@ export default function AsciiArtGenerator() {
         }
     }
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
-        if (file) {
-            const url = URL.createObjectURL(file)
-            setImageUrl(url)
+        if (!file) return
+
+        const url = URL.createObjectURL(file)
+        setImageUrl(url)
+
+        if (file.type.startsWith('video/')) {
+            setIsVideo(true)
+            await videoConverterRef.current?.loadVideo(file)
+            setVideoDuration(videoConverterRef.current?.getDuration() || 0)
+        } else {
+            setIsVideo(false)
             processImage(url)
         }
     }
@@ -97,6 +112,39 @@ export default function AsciiArtGenerator() {
         URL.revokeObjectURL(url)
     }
 
+    const togglePlayback = () => {
+        if (!videoConverterRef.current) return
+
+        if (isPlaying) {
+            videoConverterRef.current.stop()
+            setIsPlaying(false)
+        } else {
+            videoConverterRef.current.start((ascii) => {
+                setAsciiArt(ascii)
+                setVideoTime(videoConverterRef.current?.getCurrentTime() || 0)
+            }, {
+                width,
+                brightness,
+                contrast,
+                invert,
+                scaleType: scale,
+                saturation,
+                sepia,
+                hue,
+                grayscale,
+                edgeDetection,
+                edgeIntensity,
+                edgeInvertColors,
+                sharpen,
+                sharpness,
+                dithering,
+                spaceDensity,
+                transparentFrame
+            })
+            setIsPlaying(true)
+        }
+    }
+
     return (
         <Layout>
             {/* File Upload Section */}
@@ -105,8 +153,8 @@ export default function AsciiArtGenerator() {
                     <div className="flex-1">
                         <Input
                             type="file"
-                            accept="image/*"
-                            onChange={handleImageUpload}
+                            accept="image/*,video/*"
+                            onChange={handleFileUpload}
                             className="bg-black border-gray-800 text-sm file:bg-gray-900 file:text-white file:border-0"
                         />
                     </div>
@@ -346,31 +394,61 @@ export default function AsciiArtGenerator() {
                 </div>
             </div>
 
-            {/* ASCII Output Section - Added mt-12 for more space */}
+            {/* Add video controls before ASCII output if isVideo */}
+            {isVideo && (
+                <div className="bg-zinc-900/50 backdrop-blur p-4 flex items-center gap-4 mt-6">
+                    <Button
+                        onClick={togglePlayback}
+                        variant="outline"
+                        size="sm"
+                        className="border-gray-800 hover:bg-gray-900"
+                    >
+                        {isPlaying ? 'Pause' : 'Play'}
+                    </Button>
+                    <div className="flex-1">
+                        <Slider
+                            value={[videoTime]}
+                            onValueChange={(value) => {
+                                if (!videoConverterRef.current) return
+                                videoConverterRef.current.seek(value[0])
+                                setVideoTime(value[0])
+                            }}
+                            min={0}
+                            max={videoDuration}
+                            step={0.1}
+                            className="w-full"
+                        />
+                    </div>
+                    <div className="text-sm text-gray-400 w-24">
+                        {formatTime(videoTime)} / {formatTime(videoDuration)}
+                    </div>
+                </div>
+            )}
+
+            {/* ASCII Output Section */}
             <div className="space-y-2 mt-12">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-400">
                         <Upload className="w-4 h-4" />
                         <span>ASCII Output</span>
                     </div>
-                    {/* Add width slider here */}
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-gray-400">Width: {width}</span>
-                            <Slider
-                                value={[width]}
-                                onValueChange={(value) => {
-                                    setWidth(value[0])
-                                    if (imageUrl) processImage(imageUrl)
-                                }}
-                                min={20}
-                                max={200}
-                                step={1}
-                                className="w-[100px]"
-                            />
-                        </div>
+                    {/* Width slider with more space */}
+                    <div className="flex items-center gap-4 flex-1">
+                        <span className="text-sm text-gray-400">Width: {width}</span>
+                        <Slider
+                            value={[width]}
+                            onValueChange={(value) => {
+                                setWidth(value[0])
+                                if (imageUrl) processImage(imageUrl)
+                            }}
+                            min={20}
+                            max={200}
+                            step={1}
+                            className="flex-1"
+                        />
                     </div>
                 </div>
+                
                 <div className="bg-zinc-900/50 backdrop-blur p-4 overflow-auto max-h-[600px]">
                     <canvas ref={canvasRef} className="hidden" />
                     {asciiArt ? (
@@ -391,4 +469,10 @@ export default function AsciiArtGenerator() {
             </div>
         </Layout>
     );
+}
+
+function formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
 }
