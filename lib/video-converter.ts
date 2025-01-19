@@ -1,3 +1,5 @@
+// lib/video-converter.ts
+
 import { AsciiConverter, type AsciiOptions } from './ascii-converter';
 
 export class VideoConverter {

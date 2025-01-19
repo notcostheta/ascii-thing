@@ -1,3 +1,5 @@
+// lib/ascii-converter.ts
+
 const ASCII_SCALES = {
     minimalist: "#+-.",
     normal: "@%#*+=-:.",
