@@ -10,6 +10,7 @@ export class VideoConverter {
     private frameRate: number = 24;
     private asciiConverter: AsciiConverter;
     private currentOptions: AsciiOptions | null = null;
+    private videoUrl?: string;
 
     constructor(asciiConverter: AsciiConverter) {
         this.video = document.createElement('video');
@@ -20,17 +21,56 @@ export class VideoConverter {
 
     loadVideo(file: File): Promise<void> {
         return new Promise((resolve, reject) => {
+            // Check if file is a supported video format
+            const supportedTypes = ['video/mp4', 'video/webm', 'video/ogg'];
+            if (!supportedTypes.includes(file.type)) {
+                reject(new Error('Unsupported video format. Please upload an MP4, WebM, or Ogg video.'));
+                return;
+            }
+
+            // Revoke any old URL and reset the video element
+            if (this.videoUrl) {
+                URL.revokeObjectURL(this.videoUrl);
+                this.video.src = "";
+                this.video.load();
+            }
+
             const url = URL.createObjectURL(file);
+            this.videoUrl = url;
             this.video.src = url;
-            this.video.onloadedmetadata = () => {
-                // Set canvas size based on video dimensions
+            this.video.crossOrigin = 'anonymous';
+            this.video.load();
+            
+            const handleVideoLoad = () => {
+                // Calculate optimal canvas size while maintaining aspect ratio
+                const maxWidth = 200;
+                const maxHeight = 150;
                 const aspectRatio = this.video.videoHeight / this.video.videoWidth;
-                this.canvas.width = 200; // Max width
-                this.canvas.height = Math.floor(this.canvas.width * aspectRatio);
+                
+                if (aspectRatio > maxHeight/maxWidth) {
+                    this.canvas.height = maxHeight;
+                    this.canvas.width = Math.floor(maxHeight / aspectRatio);
+                } else {
+                    this.canvas.width = maxWidth;
+                    this.canvas.height = Math.floor(maxWidth * aspectRatio);
+                }
+                
+                // Ensure video is ready for frame extraction
+                this.video.currentTime = 0;
+                this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
                 resolve();
             };
-            this.video.onerror = reject;
+
+            this.video.onloadeddata = handleVideoLoad;
+            this.video.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Failed to load video. Please check the file format.'));
+            };
         });
+    }
+
+    getVideoUrl(): string | undefined {
+        return this.videoUrl;
     }
 
     start(onFrame: (ascii: string) => void, options: AsciiOptions) {
