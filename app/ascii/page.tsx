@@ -1,17 +1,16 @@
 // app/ascii/page.tsx
-
 'use client'
 
 import { useState, useRef, useEffect } from "react"
 import { Layout } from "@/components/layout"
-import { Slider } from "@/components/ui/slider"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ImageIcon, Upload, Download, Repeat } from 'lucide-react'
+import { AsciiControls, ImagePreview, VideoControls } from "./components"
 import { AsciiConverter, type AsciiScale } from "@/lib/ascii-converter"
 import { VideoConverter } from '@/lib/video-converter'
+import { Upload, ImageIcon } from 'lucide-react'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
 
 export default function AsciiArtGenerator() {
     const [asciiArt, setAsciiArt] = useState<string>("")
@@ -40,6 +39,7 @@ export default function AsciiArtGenerator() {
     const converterRef = useRef<AsciiConverter | null>(null)
     const videoConverterRef = useRef<VideoConverter | null>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
+
 
     useEffect(() => {
         converterRef.current = new AsciiConverter()
@@ -78,7 +78,7 @@ export default function AsciiArtGenerator() {
         }
     }
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
@@ -114,7 +114,7 @@ export default function AsciiArtGenerator() {
         URL.revokeObjectURL(url)
     }
 
-    const togglePlayback = () => {
+      const togglePlayback = () => {
         if (!videoConverterRef.current) return
 
         if (isPlaying) {
@@ -125,7 +125,7 @@ export default function AsciiArtGenerator() {
                 setAsciiArt(ascii)
                 setVideoTime(videoConverterRef.current?.getCurrentTime() || 0)
             }, {
-                width,
+                 width,
                 brightness,
                 contrast,
                 invert,
@@ -149,7 +149,7 @@ export default function AsciiArtGenerator() {
 
     return (
         <Layout>
-            {/* File Upload Section */}
+           {/* File Upload Section */}
             <div className="bg-zinc-900/50 backdrop-blur p-6 mb-8">
                 <div className="flex items-center gap-4">
                     <div className="flex-1">
@@ -169,168 +169,100 @@ export default function AsciiArtGenerator() {
                     </Button>
                 </div>
             </div>
-
-            {/* Main Content Area */}
+           
             <div className="space-y-8">
-                {/* Top Grid */}
                 <div className="grid grid-cols-2 gap-6">
-                    {/* Left Column - Image and Scale/Dither */}
-                    <div className="space-y-6">
-                        {/* Image Preview - Smaller height */}
-                        {imageUrl ? (
-                            <div>
-                                <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-                                    <ImageIcon className="w-4 h-4" />
-                                    <span>Original Image</span>
+                <div className="space-y-6">
+                     <ImagePreview imageUrl={imageUrl} />
+                        <AsciiControls
+                           scale={scale}
+                            setScale={setScale}
+                            dithering={dithering}
+                            setDithering={setDithering}
+                           processImage={() => { if (imageUrl) processImage(imageUrl) }}
+                        />
+                    </div>
+
+                     <div className="grid grid-rows-2 gap-6">
+                            <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
+                                {/* Brightness slider */}
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm text-gray-400 w-24">Bright: {brightness}</span>
+                                    <Slider
+                                        value={[brightness]}
+                                        onValueChange={(value) => {
+                                            setBrightness(value[0])
+                                            if (imageUrl) processImage(imageUrl)
+                                        }}
+                                        min={0}
+                                        max={100}
+                                        step={1}
+                                        className="flex-1"
+                                    />
                                 </div>
-                                <div className="bg-zinc-900/50 backdrop-blur p-4 flex items-center justify-center h-[250px]">
-                                    <img
-                                        src={imageUrl}
-                                        alt="Original"
-                                        className="max-w-full max-h-full object-contain"
+                                {/* Contrast slider */}
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm text-gray-400 w-24">Contrast: {contrast}</span>
+                                    <Slider
+                                        value={[contrast]}
+                                        onValueChange={(value) => {
+                                            setContrast(value[0])
+                                            if (imageUrl) processImage(imageUrl)
+                                        }}
+                                        min={0}
+                                        max={100}
+                                        step={1}
+                                        className="flex-1"
+                                    />
+                                </div>
+                                {/* Saturation slider */}
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm text-gray-400 w-24">Sat: {saturation}</span>
+                                    <Slider
+                                        value={[saturation]}
+                                        onValueChange={(value) => {
+                                            setSaturation(value[0])
+                                            if (imageUrl) processImage(imageUrl)
+                                        }}
+                                        min={0}
+                                        max={200}
+                                        step={1}
+                                        className="flex-1"
+                                    />
+                                </div>
+                                {/* Add invert slider here */}
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm text-gray-400 w-24">Invert: {invert}</span>
+                                    <Slider
+                                        value={[invert]}
+                                        onValueChange={(value) => {
+                                            setInvert(value[0])
+                                            if (imageUrl) processImage(imageUrl)
+                                        }}
+                                        min={0}
+                                        max={100}
+                                        step={1}
+                                        className="flex-1"
                                     />
                                 </div>
                             </div>
-                        ) : (
-                            <div className="h-[250px] bg-zinc-900/50 backdrop-blur flex items-center justify-center text-gray-500">
-                                Upload an image to begin
-                            </div>
-                        )}
-
-                        {/* Scale and Dithering Controls */}
-                        <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
-                            {/* ASCII Scale selector */}
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-400 w-24">Scale</span>
-                                <Select value={scale} onValueChange={(value: AsciiScale) => {
-                                    setScale(value)
-                                    if (imageUrl) processImage(imageUrl)
-                                }}>
-                                    <SelectTrigger className="w-[180px]">
-                                        <SelectValue placeholder="Select scale" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="minimalist">Minimalist</SelectItem>
-                                        <SelectItem value="normal">Normal</SelectItem>
-                                        <SelectItem value="normal2">Normal 2</SelectItem>
-                                        <SelectItem value="alphabetic">Alphabetic</SelectItem>
-                                        <SelectItem value="alphanumeric">Alphanumeric</SelectItem>
-                                        <SelectItem value="numerical">Numerical</SelectItem>
-                                        <SelectItem value="extended">Extended</SelectItem>
-                                        <SelectItem value="math">Math</SelectItem>
-                                        <SelectItem value="arrow">Arrow</SelectItem>
-                                        <SelectItem value="grayscale">Grayscale</SelectItem>
-                                        <SelectItem value="codepage437">CodePage 437</SelectItem>
-                                        <SelectItem value="blockelement">Block Element</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Dithering selector */}
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-400 w-24">Dither</span>
-                                <Select value={dithering} onValueChange={(value: typeof dithering) => {
-                                    setDithering(value)
-                                    if (imageUrl) processImage(imageUrl)
-                                }}>
-                                    <SelectTrigger className="w-[180px]">
-                                        <SelectValue placeholder="Select dithering" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        <SelectItem value="FloydSteinberg">Floyd-Steinberg</SelectItem>
-                                        <SelectItem value="JJN">Jarvis, Judice, and Ninke</SelectItem>
-                                        <SelectItem value="Stucki">Stucki</SelectItem>
-                                        <SelectItem value="Atkinson">Atkinson</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Side - All Controls */}
-                    <div className="grid grid-rows-2 gap-6">
-                        {/* Top Row - Image Adjustments */}
-                        <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
-                            {/* Brightness slider */}
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-400 w-24">Bright: {brightness}</span>
-                                <Slider
-                                    value={[brightness]}
-                                    onValueChange={(value) => {
-                                        setBrightness(value[0])
-                                        if (imageUrl) processImage(imageUrl)
-                                    }}
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    className="flex-1"
-                                />
-                            </div>
-                            {/* Contrast slider */}
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-400 w-24">Contrast: {contrast}</span>
-                                <Slider
-                                    value={[contrast]}
-                                    onValueChange={(value) => {
-                                        setContrast(value[0])
-                                        if (imageUrl) processImage(imageUrl)
-                                    }}
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    className="flex-1"
-                                />
-                            </div>
-                            {/* Saturation slider */}
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-400 w-24">Sat: {saturation}</span>
-                                <Slider
-                                    value={[saturation]}
-                                    onValueChange={(value) => {
-                                        setSaturation(value[0])
-                                        if (imageUrl) processImage(imageUrl)
-                                    }}
-                                    min={0}
-                                    max={200}
-                                    step={1}
-                                    className="flex-1"
-                                />
-                            </div>
-                            {/* Add invert slider here */}
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-400 w-24">Invert: {invert}</span>
-                                <Slider
-                                    value={[invert]}
-                                    onValueChange={(value) => {
-                                        setInvert(value[0])
-                                        if (imageUrl) processImage(imageUrl)
-                                    }}
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    className="flex-1"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Bottom Row - Effects */}
-                        <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
+                        
+                           <div className="bg-zinc-900/50 backdrop-blur p-4 space-y-4">
                             {/* Space Density slider */}
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-400 w-24">Space: {spaceDensity}</span>
-                                <Slider
-                                    value={[spaceDensity]}
-                                    onValueChange={(value) => {
-                                        setSpaceDensity(value[0])
-                                        if (imageUrl) processImage(imageUrl)
-                                    }}
-                                    min={0.1}
-                                    max={5}
-                                    step={0.1}
-                                    className="flex-1"
-                                />
-                            </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm text-gray-400 w-24">Space: {spaceDensity}</span>
+                                    <Slider
+                                        value={[spaceDensity]}
+                                        onValueChange={(value) => {
+                                            setSpaceDensity(value[0])
+                                            if (imageUrl) processImage(imageUrl)
+                                        }}
+                                        min={0.1}
+                                        max={5}
+                                        step={0.1}
+                                        className="flex-1"
+                                    />
+                                </div>
 
                             {/* Edge Detection controls */}
                             <div className="space-y-2">
@@ -392,43 +324,23 @@ export default function AsciiArtGenerator() {
                                 )}
                             </div>
                         </div>
-                    </div>
+                     </div>
                 </div>
             </div>
-
-            {/* Add video controls before ASCII output if isVideo */}
-            {isVideo && (
-                <div className="bg-zinc-900/50 backdrop-blur p-4 flex items-center gap-4 mt-6">
-                    <Button
-                        onClick={togglePlayback}
-                        variant="outline"
-                        size="sm"
-                        className="border-gray-800 hover:bg-gray-900"
-                    >
-                        {isPlaying ? 'Pause' : 'Play'}
-                    </Button>
-                    <div className="flex-1">
-                        <Slider
-                            value={[videoTime]}
-                            onValueChange={(value) => {
-                                if (!videoConverterRef.current) return
-                                videoConverterRef.current.seek(value[0])
-                                setVideoTime(value[0])
-                            }}
-                            min={0}
-                            max={videoDuration}
-                            step={0.1}
-                            className="w-full"
-                        />
-                    </div>
-                    <div className="text-sm text-gray-400 w-24">
-                        {formatTime(videoTime)} / {formatTime(videoDuration)}
-                    </div>
-                </div>
-            )}
-
-            {/* ASCII Output Section */}
-            <div className="space-y-2 mt-12">
+             {isVideo && (
+                <VideoControls
+                    isPlaying={isPlaying}
+                    togglePlayback={togglePlayback}
+                    videoTime={videoTime}
+                    videoDuration={videoDuration}
+                    onSeek={(value) => {
+                         if (!videoConverterRef.current) return
+                         videoConverterRef.current.seek(value)
+                         setVideoTime(value)
+                    }}
+                />
+             )}
+               <div className="space-y-2 mt-12">
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-400">
                         <Upload className="w-4 h-4" />
@@ -450,7 +362,6 @@ export default function AsciiArtGenerator() {
                         />
                     </div>
                 </div>
-                
                 <div className="bg-zinc-900/50 backdrop-blur p-4 overflow-auto max-h-[600px]">
                     <canvas ref={canvasRef} className="hidden" />
                     {asciiArt ? (
@@ -463,18 +374,19 @@ export default function AsciiArtGenerator() {
                         </div>
                     )}
                 </div>
-                {asciiArt && (
+                 {asciiArt && (
                     <div className="text-sm text-gray-500">
                         Output Size: {width} cols × {asciiArt.split('\n').length} rows
                     </div>
                 )}
+                 {asciiArt && (
+                    <div className="flex justify-end">
+                       <Button onClick={handleDownload} variant="outline" className="border-gray-800 hover:bg-gray-900">
+                            Download ASCII
+                         </Button>
+                    </div>
+                 )}
             </div>
         </Layout>
     );
-}
-
-function formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
 }
